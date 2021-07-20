@@ -486,7 +486,6 @@ write_to_file(str(message3), path + filename)
 
 post_email = True
 if post_email:
-    # with open("C:\\Users\\Thalo\\Development\\project_backtest\\console.txt", "a") as logfile:
     with open('/home/thalo/Development/stock_console.log', 'a') as logfile:
         try:
             s = smtplib.SMTP(host="mail.privateemail.com", port=587)
@@ -501,8 +500,8 @@ if post_email:
             s.login(first, second)
 
             msg = multipart.MIMEMultipart()
-            msg["From"]="admin@thalo.xyz"
-            msg["To"]="thalo_m@yahoo.com"
+            msg["From"]="REDACTED"
+            msg["To"]="REDACTED"
             msg["Subject"]="Today's Message Is {}".format(np.datetime64('today'))
             msg.attach(text.MIMEText(str(message), 'plain'))
 
