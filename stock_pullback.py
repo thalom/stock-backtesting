@@ -34,6 +34,7 @@
 import pandas as pd
 import numpy as np
 from pandas_datareader import data
+import yfinance as yfin
 # from pandas_datareader.nasdaq_trader import get_nasdaq_symbols
 from sklearn.model_selection import train_test_split
 
@@ -41,6 +42,8 @@ import os
 import smtplib
 from email.mime import multipart, text
 from email import mime
+
+yfin.pdr_override()
 
 
 # In[167]:
@@ -50,6 +53,9 @@ from email import mime
 ##-------------##
 
 def calculate_hold_score(dataset, time_period, fund, end):
+    """Return the percent change of the fund over time_period, a number of days,
+    preceding the end, a datetime representing the last day of the time period.
+    """
     suffix = "_Adj Close"
     ### This is me holding an index fund for time_period days
     if not fund.endswith(suffix):
@@ -57,9 +63,20 @@ def calculate_hold_score(dataset, time_period, fund, end):
 
 #     end = start + time_period
     start = end - time_period
-    return (constant[fund].iloc[end] -             constant[fund].iloc[start]) / constant[fund].iloc[start]
+    return (constant[fund].iloc[end] -
+            constant[fund].iloc[start]) / constant[fund].iloc[start]
 
 def make_pullbacks(dataset, long, short, top_n, end, symbols, force_buy=False):
+    """Return the set of stocks (a subset of symbols) that
+    performed the best over the period of days, long
+    and the worst over the period of days, short.
+    This set is defined as the top_n-many stocks that BOTH performed
+    the best over long and the worst over short up until
+    the date defined by end.
+
+    force_buy - optional argument to guarantee at least one symbol
+    is returned by increasing the size of top_n.
+    """
     suffix = "_Adj Close"
     four_mo_performance_dict = {}
 #     end = start + long
@@ -69,7 +86,9 @@ def make_pullbacks(dataset, long, short, top_n, end, symbols, force_buy=False):
     for col in symbols:
         if not col.endswith(suffix):
             col = "".join([col, suffix])
-        four_mo_performance_dict[col] =                 (dataset[col][end] - dataset[col][start]) /                 dataset[col][start]
+        four_mo_performance_dict[col] =
+                (dataset[col][end] - dataset[col][start]) /
+                dataset[col][start]
 
     best_appreciators = []
     for _ in range(top_n):
@@ -85,7 +104,9 @@ def make_pullbacks(dataset, long, short, top_n, end, symbols, force_buy=False):
     for col in symbols:
         if not col.endswith(suffix):
             col = "".join([col, suffix])
-        ten_day_performance_dict[col] =                 (dataset[col][end] - dataset[col][start]) /                 dataset[col][start]
+        ten_day_performance_dict[col] =
+                (dataset[col][end] - dataset[col][start]) /
+                dataset[col][start]
 
     worst_appreciators = []
     for n in range(top_n):
@@ -106,6 +127,10 @@ def make_pullbacks(dataset, long, short, top_n, end, symbols, force_buy=False):
     return list(intersection)
 
 def make_tops(dataset, long, top_n, end, symbols):
+    """Return a list of stocks as a subset of symbols
+    top_n-many long of the top performing stocks over the last
+    long-many days up to the datetime end.
+    """
     suffix = "_Adj Close"
     four_mo_performance_dict = {}
 #     end = start + long
@@ -115,7 +140,10 @@ def make_tops(dataset, long, top_n, end, symbols):
     for col in symbols:
         if not col.endswith(suffix):
             col = "".join([col, suffix])
-        four_mo_performance_dict[col] =                 (dataset[col][end] -                 dataset[col][start]) /                 dataset[col][start]
+        four_mo_performance_dict[col] =
+                (dataset[col][end] -
+                dataset[col][start]) /
+                dataset[col][start]
 
     best_appreciators = []
     for _ in range(top_n):
@@ -137,6 +165,7 @@ def as_column(built_list, dataframe, shift=False):
     return new_col
 
 def make_buy_hold_pullbacks(pullback_col, top_col, long, dataframe):
+    
     new_col = []
     for j, i in enumerate(range(long, len(dataframe))):
         new_col.append(dataframe.iloc[i][pullback_col])
@@ -177,45 +206,17 @@ path = "/home/thalo/Development/"
 filename = "stock_output.log"
 suffix = "_Adj Close"
 # vanguard_funds = ['BIV', 'BLV', 'BND', 'BNDW', 'BNDX', 'BSV', 'EDV', 'ESGV', 'IVOG', 'IVOO', 'IVOV', 'MGC', 'MGK', 'MGV', 'VAW', 'VB', 'VBK', 'VBR', 'VCIT', 'VCLT', 'VCR', 'VCSH', 'VDC', 'VDE', 'VEA', 'VEU', 'VFH', 'VFLQ', 'VFMF', 'VFMO', 'VFMV', 'VFQY', 'VFVA', 'VGIT', 'VGK', 'VGLT', 'VGSH', 'VGT', 'VHT', 'VIG', 'VIGI', 'VIOG', 'VIOO', 'VIOV', 'VIS', 'VMBS', 'VNQ', 'VNQI', 'VO', 'VOE', 'VONE', 'VONG', 'VONV', 'VOO', 'VOOG', 'VOOV', 'VOT', 'VOX', 'VPL', 'VPU', 'VSGX', 'VSS', 'VT', 'VTC', 'VTEB', 'VTHR', 'VTI', 'VTIP', 'VTV', 'VTWG', 'VTWO', 'VTWV', 'VUG', 'VV', 'VWO', 'VWOB', 'VXF', 'VXUS', 'VYM', 'VYMI']
-good_funds = ['VGT', ]# 'VCR', 'VPU', 'EDV', 'VDE']
 
-# In[155]:
 
 
 ### Get data ###
 ##------------##
 
 new_dict = {}
-symbols = [
-    'LIN', 'ECL', 'IFF', 'FMC', 'CF', 'ALB', 'AXTA', 'NKE', 'CL', 'PM', 'EL', 'ATVI', 
-    'EA', 'TSLA', 'STZ', 'MNST', 'LULU', 'HSY', 'MKC', 'CHD', 'BF-B', 'TTWO', 'NVR', 
-    'CLX', 'LW', 'W', 'FBHS', 'LKQ', 'DHI', 'LEN', 'WBC', 'HRL', 'UAA', 'UA', 
-    'LEN-B', 'AMZN', 'HD', 'CMCSA', 'NFLX', 'MCD', 'DIS', 'COST', 'SBUX', 'BKNG', 'LOW', 
-    'CHTR', 'TJX', 'MAR', 'ROST', 'DG', 'YUM', 'ORLY', 'HLT', 'AZO', 'DLTR', 'CMG', 
-    'ULTA', 'EXPE', 'CPRT', 'TSCO', 'LUV', 'DPZ', 'WYNN', 'FDS', 'RCL', 'LYV', 'ATUS', 
-    'UBER', 'SIRI', 'MGM', 'ROL', 'TIF', 'MTN', 'LYFT', 'TRIP', 'CHWY', 'CVNA', 
-    'H', 'V', 'MA', 'AMT', 'SPGI', 'CCI', 'MMC', 'PLD', 'ICE', 'SCHW', 'SPG', 'AON', 
-    'EQIX', 'PSA', 'MCO', 'AVB', 'SBAC', 'TROW', 'DLR', 'INFO', 'O', 'BXP', 'MSCI', 
-    'ESS', 'WELL', 'CBRE', 'EFX', 'FRC', 'AJG', 'ARE', 'MKL', 'AMTD', 'MAA', 'EXR', 
-    'UDR', 'SIVB', 'CBOE', 'REG', 'INVH', 'VNO', 'ETFC', 'FRT', 'IRM', 'SEIC', 'RJF', 
-    'CPT', 'IBKR', 'TMO', 'BMY', 'BDX',  'SYK', 'ISRG', 'BSX', 'ZTS', 'ILMN', 
-    'ABBV', 'VRTX', 'EW', 'ALXN', 'IQV', 'REGN', 'IDXX', 'BIIB', 'CNC', 'BAX',
-    'ALGN', 'RMD', 'COO', 'INCY', 'BMRN', 'TFX', 'DXCM', 'VAR', 'ABMD', 'ALNY', 
-    'JAZZ', 'EXAS', 'SGEN', 'NKTR', 'BA', 'PYPL', 'UNP', 'ACN', 'LMT', 'UPS', 'ADP', 
-    'MMM', 'DHR', 'FIS', 'SHW', 'ROP', 'FISV', 'APH', 'PAYX', 'WCN', 'GPN', 
-    'SQ', 'FLT', 'A', 'FTV', 'TDG', 'VRSK', 'ITW', 'CTAS', 'MTD', 'AME', 'CSGP', 
-    'ROK', 'FAST', 'VMC', 'KEYS', 'XYL', 'BR', 'MLM', 'WAT', 'TRU', 'EXPD', 'KSU', 
-    'MAS', 'WAB', 'TRMB', 'ODFL', 'JBHT', 'RHI', 'CHRW', 'IPGP', 'URI', 'JKHY', 
-    'PKG', 'ST', 'CGNX', 'HEI-A', 'FLIR', 'HUBB', 'AOS', 'HEI', 'XPO', 'EOG',  
-    'OKE', 'PXD', 'CXO', 'OXY', 'FANG', 'LNG', 'APA', 'NBL', 'COG', 'TRGP', 'CLR', 
-    'XEC', 'MSFT', 'AAPL', 'FB', 'GOOGL', 'GOOG', 'ADBE', 'CRM', 'AVGO', 'TXN', 
-    'NVDA', 'INTU', 'NOW', 'MU', 'AMAT', 'ADI', 'ADSK', 'WDAY',  'XLNX', 'AMD',
-    'LRCX', 'TWTR', 'CERN', 'VRSN', 'LHX', 'VEEV', 'MCHP', 'CDNS', 'SNPS', 'KLAC', 
-    'SPLK', 'PANW', 'CTSH', 'ANSS', 'MTCH', 'MXIM', 'TWLO', 'ANET', 'IT', 'MSI', 'SWKS', 
-    'VMW', 'AKAM', 'SSNC', 'GDDY', 'CTXS', 'FTNT', 'SNAP', 'FFIV', 'BKI', 'OKTA', 
-    'PAYC', 'DBX', 'WORK', 'CDK', 'PINS', 'CRWD', 'TMUS', 'ZAYO', 'ZM', 'NRG'
-    # 'RHT', 'WP', 'APC', 'TSS', 'WCG', 'CELG',
-        ]
+with open('symbol_list.txt') as in_file:
+    symbols = in_file.read().split('\n')
+with open('good_funds.txt') as in_file:
+    good_funds = in_file.read().split('\n')
 symbols.extend(good_funds)
 symbols = list(set(symbols))
 
@@ -228,7 +229,8 @@ error_symbols = []
 for x in symbols:
     try:
         # y = data.DataReader(x, 'stooq')
-        y = data.DataReader(x, 'yahoo', np.datetime64('today') - np.timedelta64(52, 'W'), np.datetime64('today'))
+        # y = data.DataReader(x, 'yahoo', np.datetime64('today') - np.timedelta64(52, 'W'), np.datetime64('today'))
+        y = data.get_data_yahoo(x, start=np.datetime64('today') - np.timedelta64(52, 'W'), end=np.datetime64('today'))
         if len(y) < 1:
             raise Exception("Got nothing back")
         new_dict[x] = y
@@ -255,7 +257,6 @@ for ticker in the_rest:
 del new_dict
 # constant.to_csv("C:\\Users\\Thalo\\Development\\project_backtest\\stocks{}.csv".format(np.datetime64('today')))
 
-# In[156]:
 
 
 # good_funds = []
@@ -295,20 +296,11 @@ good_funds = list(set(good_funds))
 # print("Good funds:", good_funds)
 """
 
-# In[ ]:
 
 
 # above_line = [max([calculate_hold_score(constant, 1, fund, i) for fund in good_funds]) for i in range(75, len(constant))]
 # constant['best_index_holds'] = as_column(above_line, constant)
 
-
-# In[ ]:
-
-
-
-
-
-# In[377]:
 
 
 # Variables
@@ -352,17 +344,10 @@ AVG = 'unweighted'
 
 
 
-# In[378]:
-
-
-
 for fund in good_funds:
     vang_scores = [calculate_hold_score(constant, PERIOD, fund, i) for i in range(1, len(constant))]
     constant[fund + '_1D_return'] = as_column(vang_scores, constant)
 
-
-
-# In[379]:
 
 
 # def calculate_hold_score(dataset, time_period, fund, start)
@@ -388,8 +373,6 @@ if not force_buy:
     constant['pullback_names'].fillna(method="ffill", inplace=True)
 
 
-# In[380]:
-
 
 ### Is this score really necessary? Like this is an incomplete column to be sure
 
@@ -400,16 +383,12 @@ pullback_score_col = [np.array([calculate_hold_score(constant, PERIOD, x, i)
 constant['pullback_score'] = as_column(pullback_score_col, constant)
 
 
-# In[381]:
-
 
 # LONG = 140
 # MAX_N = 13
 top_name_col = [(make_tops(constant, LONG, MAX_N, i, symbols),) for i in range(LONG, len(constant)+1)]
 constant['top_13_names'] = as_column(top_name_col, constant, shift=False)
 
-
-# In[382]:
 
 
 top_score_col = [np.array([calculate_hold_score(constant, PERIOD, x, i)
@@ -431,8 +410,6 @@ buy_hold_pullback_col = make_buy_hold_pullbacks("pullback_names", "top_13_names"
 constant['buy_hold_pullback_names'] = as_column(pd.DataFrame([buy_hold_pullback_col, [np.nan] * len(buy_hold_pullback_col)]).T, constant)[0]
 
 
-# In[384]:
-
 
 buy_hold_pullback_score_col = [np.array([calculate_hold_score(constant, PERIOD, x, i)
          for x in constant['buy_hold_pullback_names'].iloc[i]]).mean()
@@ -441,13 +418,9 @@ buy_hold_pullback_score_col = [np.array([calculate_hold_score(constant, PERIOD, 
 constant['buy_hold_pb_score'] = as_column(buy_hold_pullback_score_col, constant)
 
 
-# In[385]:
-
 
 alt_message = constant.iloc[140:, -(7+len(good_funds)):]
 
-
-# In[399]:
 
 
 # total = 6870
@@ -486,6 +459,7 @@ write_to_file(str(message3), path + filename)
 
 post_email = True
 if post_email:
+    # with open("C:\\Users\\Thalo\\Development\\project_backtest\\console.txt", "a") as logfile:
     with open('/home/thalo/Development/stock_console.log', 'a') as logfile:
         try:
             s = smtplib.SMTP(host="mail.privateemail.com", port=587)
@@ -500,8 +474,8 @@ if post_email:
             s.login(first, second)
 
             msg = multipart.MIMEMultipart()
-            msg["From"]="REDACTED"
-            msg["To"]="REDACTED"
+            msg["From"]="admin@thalo.xyz"
+            msg["To"]="thalo_m@yahoo.com"
             msg["Subject"]="Today's Message Is {}".format(np.datetime64('today'))
             msg.attach(text.MIMEText(str(message), 'plain'))
 
